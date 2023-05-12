@@ -1,0 +1,152 @@
+version: '3.5'
+services:
+  cambio-db:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      TZ: America/Sao_Paulo
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: root
+      MYSQL_DATABASE: cambio_service
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_TCP_PORT: 3308
+    ports:
+      - 3308:3308
+    expose:
+      - 3308
+    networks:
+      - gil-network
+  book-db:
+    image: mysql
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      TZ: America/Sao_Paulo
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: root
+      MYSQL_DATABASE: book_service
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_TCP_PORT: 3312
+    ports:
+      - 3312:3312
+    expose:
+      - 3312
+    networks:
+      - gil-network
+  naming-server:
+    image: gilmarbnp/naming-server:0.0.1-SNAPSHOT
+    ports:
+      - 8761:8761
+    networks:
+      - gil-network
+  api-gateway:
+    image: gilmarbnp/api-gateway:0.0.1-SNAPSHOT
+    ports:
+      - 8765:8765
+    restart: on-failure
+    depends_on:
+      - naming-server
+      - rabbit-mq
+    environment:
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING.ZIPKIN.BASEURL: http://zipkin-service:9411/
+      MANAGEMENT.TRACING.SAMPLING.PROBABILITY: 1.0
+      MANAGEMENT.ZIPKIN.TRACING.ENDPOINT: http://zipkin-service:9411/api/v2/spans
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+      SPRING_RABBITMQ_HOST: rabbit-mq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+    networks:
+      - gil-network
+  cambio-service:
+    image: gilmarbnp/cambio-service:0.0.1-SNAPSHOT
+    restart: always
+    build:
+      context: .
+      dockerfile: 06-cambio-service/Dockerfile
+    environment:
+      TZ: America/Sao_Paulo
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+      SPRING_RABBITMQ_HOST: rabbit-mq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING.ZIPKIN.BASEURL: http://zipkin-service:9411/
+      MANAGEMENT.TRACING.SAMPLING.PROBABILITY: 1.0
+      MANAGEMENT.ZIPKIN.TRACING.ENDPOINT: http://zipkin-service:9411/api/v2/spans
+      SPRING.DATASOURCE.URL: jdbc:mysql://cambio-db:3308/cambio_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.DATASOURCE.USERNAME: root
+      SPRING.DATASOURCE.PASSWORD: root
+      SPRING.FLYWAY.URL: jdbc:mysql://cambio-db:3308/cambio_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.FLYWAY.USER: root
+      SPRING.FLYWAY.PASSWORD: root
+    ports:
+      - 8000:8000
+    depends_on:
+      - naming-server
+      - cambio-db
+      - rabbit-mq
+    networks:
+      - gil-network
+  book-service:
+    image: gilmarbnp/book-service:0.0.1-SNAPSHOT
+    restart: always
+    build:
+      context: .
+      dockerfile: 06-book-service/Dockerfile
+    environment:
+      TZ: America/Sao_Paulo
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+      RABBIT_ADDRESSES: rabbitmq
+      SPRING_RABBITMQ_HOST: rabbit-mq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING.ZIPKIN.BASEURL: http://zipkin-service:9411/
+      MANAGEMENT.TRACING.SAMPLING.PROBABILITY: 1.0
+      MANAGEMENT.ZIPKIN.TRACING.ENDPOINT: http://zipkin-service:9411/api/v2/spans
+      SPRING.DATASOURCE.URL: jdbc:mysql://book-db:3312/book_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.DATASOURCE.USERNAME: root
+      SPRING.DATASOURCE.PASSWORD: root
+      SPRING.FLYWAY.URL: jdbc:mysql://book-db:3312/book_service?useSSL=false&serverTimezone=UTC&enabledTLSProtocols=TLSv1.2
+      SPRING.FLYWAY.USER: root
+      SPRING.FLYWAY.PASSWORD: root
+    ports:
+      - 8100:8100
+    depends_on:
+      - naming-server
+      - book-db
+      - rabbit-mq
+    networks:
+      - gil-network
+  rabbit-mq:
+    image: rabbitmq:3.8.14-management
+    restart: always
+    volumes:
+      - ./rabbitmq.config:/etc/rabbitmq/rabbitmq.config
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_TRACING: on
+      MANAGEMENT.TRACING.SAMPLING.PROBABILITY: 1.0
+      RABBITMQ_OPENTRACING_COLLECTOR_URL: http://zipkin-service:9411/api/v2/spans
+    networks:
+      - gil-network
+  zipkin-service:
+    image: openzipkin/zipkin
+    restart: always
+    ports:
+      - 9411:9411
+    depends_on: 
+      - rabbit-mq
+    environment:
+      RABBIT_ADDRESSES: rabbitmq
+      RABBIT_URI: amqp://guest:guest@rabbit-mq:5672
+      SPRING_RABBITMQ_HOST: rabbit-mq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+    networks:
+      - gil-network
+networks:
+  gil-network:
+    driver: bridge
