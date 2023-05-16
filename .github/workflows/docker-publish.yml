@@ -21,7 +21,7 @@ jobs:
          
       - name: Build Eureka Naming Server Container Image
         working-directory: ./Microservice-docker-zipkin-rabbitmq/06-naming-server
-      - run: mvn spring-boot:build-image -DskipTests 
+        run: mvn spring-boot:build-image -DskipTests 
 
    
       
