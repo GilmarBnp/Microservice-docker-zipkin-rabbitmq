@@ -128,7 +128,6 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-      RABBITMQ_TRACING: null
       RABBITMQ_OPENTRACING_COLLECTOR_URL: http://zipkin-service:9411/api/v2/spans
     networks:
       - gil-network
@@ -137,7 +136,7 @@ services:
     restart: always
     ports:
       - 9411:9411
-    depends_on: 
+    depends_on:
       - rabbit-mq
     environment:
       RABBIT_ADDRESSES: rabbitmq
