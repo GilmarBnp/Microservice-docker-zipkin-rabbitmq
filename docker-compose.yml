@@ -128,7 +128,6 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-      MANAGEMENT.TRACING.SAMPLING.PROBABILITY: 1.0
       RABBITMQ_OPENTRACING_COLLECTOR_URL: http://zipkin-service:9411/api/v2/spans
     networks:
       - gil-network
