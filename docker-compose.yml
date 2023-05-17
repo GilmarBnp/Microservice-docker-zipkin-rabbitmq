@@ -128,6 +128,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+      MANAGEMENT.TRACING.SAMPLING.PROBABILITY: 1.0
     networks:
       - gil-network
   zipkin-service:
